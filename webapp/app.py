@@ -1,6 +1,7 @@
 """Streamlit UI for the AI CSV reader, backed by Claude."""
 
 import anthropic
+import matplotlib.pyplot as plt
 import streamlit as st
 
 import ai
@@ -82,5 +83,6 @@ if df is not None:
                         f"{chart.chart_type}: x={chart.x_column}, y={chart.y_column}"
                     )
                     st.pyplot(fig)
+                    plt.close(fig)
             except Exception as e:  # noqa: BLE001
                 st.error(_friendly_ai_error(e))

@@ -70,6 +70,8 @@ def plan_query(question: str, summary: dict) -> QueryPlan:
         messages=[{"role": "user", "content": user}],
         output_format=QueryPlan,
     )
+    if response.parsed_output is None:
+        raise ValueError("Claude did not return a usable query plan.")
     return response.parsed_output
 
 
@@ -92,6 +94,8 @@ def plan_chart(request: str, summary: dict) -> ChartPlan:
         messages=[{"role": "user", "content": user}],
         output_format=ChartPlan,
     )
+    if response.parsed_output is None:
+        raise ValueError("Claude did not return a usable chart plan.")
     return response.parsed_output
 
 

@@ -8,6 +8,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import pandas as pd
 
 
 def execute_plan(df, plan: dict):
@@ -21,6 +22,13 @@ def execute_plan(df, plan: dict):
             val = flt.get("value")
             if col not in working.columns:
                 return None, "Filter column not found"
+            # The AI passes filter values as strings; coerce to the column's
+            # dtype so a filter on a numeric column actually matches.
+            if pd.api.types.is_numeric_dtype(working[col]):
+                try:
+                    val = pd.to_numeric(val)
+                except (ValueError, TypeError):
+                    pass
             working = working[working[col] == val]
 
         group_by = plan.get("group_by")

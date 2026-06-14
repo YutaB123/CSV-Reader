@@ -47,3 +47,16 @@ def test_missing_filter_column_errors():
     result, err = execute_plan(_df(), plan)
     assert result is None
     assert "not found" in err.lower()
+
+
+def test_numeric_filter_value_is_coerced():
+    # The AI sends filter values as strings; a numeric column must still match.
+    df = pd.DataFrame({"flag": [0, 1, 1, 1], "amount": [5, 10, 15, 20]})
+    plan = {
+        "filter": {"column": "flag", "value": "1"},
+        "aggregation": "sum",
+        "metric": "amount",
+    }
+    result, err = execute_plan(df, plan)
+    assert err is None
+    assert result == 45  # 10 + 15 + 20, not 0
