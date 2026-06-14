@@ -15,8 +15,20 @@ runs it locally on the full data, and the AI explains the computed result.
    `ANTHROPIC_API_KEY = "sk-ant-..."`
 3. `streamlit run webapp/app.py`
 
+The key and model are read from Streamlit secrets *or* environment variables,
+so the app deploys on either Streamlit Community Cloud or Render.
+
 **Deploy on Streamlit Community Cloud:**
 1. Connect this repo at https://share.streamlit.io
 2. Set the main file to `webapp/app.py`
 3. Add `ANTHROPIC_API_KEY` (and optional `ANTHROPIC_MODEL`, default
    `claude-haiku-4-5`) in the app's Secrets settings.
+
+**Deploy on Render:**
+1. The repo includes `render.yaml`. At https://render.com, click
+   **New → Blueprint** and select this repo, or create a **Web Service** with:
+   - Build command: `pip install -r requirements.txt`
+   - Start command:
+     `streamlit run webapp/app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true`
+2. Add `ANTHROPIC_API_KEY` as an environment variable (and optionally
+   `ANTHROPIC_MODEL`).

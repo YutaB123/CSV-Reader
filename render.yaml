@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: csv-reader
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run webapp/app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_MODEL
+        value: claude-haiku-4-5

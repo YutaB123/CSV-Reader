@@ -12,10 +12,10 @@ st.set_page_config(page_title="CSV Data Analyzer", page_icon="📊", layout="wid
 st.title("📊 CSV Data Analyzer")
 st.caption("Upload a CSV, explore the data, and ask questions — powered by Claude.")
 
-if "ANTHROPIC_API_KEY" not in st.secrets:
+if not ai.api_key_configured():
     st.error(
-        "The app admin needs to set the ANTHROPIC_API_KEY secret in the "
-        "Streamlit Cloud settings before AI features will work."
+        "The app admin needs to set ANTHROPIC_API_KEY (as a Streamlit secret "
+        "or an environment variable) before AI features will work."
     )
 
 uploaded = st.file_uploader("Select a CSV file", type=["csv"])

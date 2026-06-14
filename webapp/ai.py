@@ -1,11 +1,13 @@
 """AI layer: Claude calls that return structured plans.
 
-Reads the API key and model from Streamlit secrets. The only data passed to
-Claude is the schema+stats summary from data.summarize() and already-computed
-results — never raw rows.
+Reads the API key and model from configuration that works on both Streamlit
+Community Cloud (st.secrets) and Render/other hosts (environment variables).
+The only data passed to Claude is the schema+stats summary from
+data.summarize() and already-computed results — never raw rows.
 """
 
 import json
+import os
 from typing import List, Optional
 
 import anthropic
@@ -42,12 +44,31 @@ class ChartPlan(BaseModel):
 DEFAULT_MODEL = "claude-haiku-4-5"
 
 
+def _config(name: str, default=None):
+    """Read config from Streamlit secrets (Streamlit Cloud) or env vars (Render).
+
+    st.secrets raises if no secrets file exists, so guard the lookup and fall
+    back to the environment.
+    """
+    try:
+        if name in st.secrets:
+            return st.secrets[name]
+    except Exception:  # noqa: BLE001 - no secrets file present (e.g. on Render)
+        pass
+    return os.environ.get(name, default)
+
+
+def api_key_configured() -> bool:
+    """True if an Anthropic API key is available from secrets or env."""
+    return bool(_config("ANTHROPIC_API_KEY"))
+
+
 def _client() -> anthropic.Anthropic:
-    return anthropic.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
+    return anthropic.Anthropic(api_key=_config("ANTHROPIC_API_KEY"))
 
 
 def _model() -> str:
-    return st.secrets.get("ANTHROPIC_MODEL", DEFAULT_MODEL)
+    return _config("ANTHROPIC_MODEL", DEFAULT_MODEL)
 
 
 def plan_query(question: str, summary: dict) -> QueryPlan:
