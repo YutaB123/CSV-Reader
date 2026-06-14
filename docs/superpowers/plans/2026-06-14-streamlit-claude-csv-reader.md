@@ -4,24 +4,27 @@
 
 **Goal:** Port the Gradio CSV analyzer to a Streamlit app deployed on Streamlit Community Cloud, backed by Claude instead of OpenAI, sending only schema + summary stats to the model.
 
-**Architecture:** Three modules under `streamlit/` — `data.py` (pandas parsing + summary that is the only thing the AI sees), `ai.py` (Anthropic SDK calls returning structured plans), and `app.py` (Streamlit UI + local pandas/matplotlib execution). The AI returns *plans*; Python executes them on the full DataFrame locally.
+**Architecture:** Three modules under `webapp/` — `data.py` (pandas parsing + summary that is the only thing the AI sees), `ai.py` (Anthropic SDK calls returning structured plans), and `app.py` (Streamlit UI + local pandas/matplotlib execution). The AI returns *plans*; Python executes them on the full DataFrame locally.
 
 **Tech Stack:** Python, Streamlit, pandas, matplotlib, anthropic SDK, pydantic, pytest.
+
+> **IMPORTANT — folder name:** the app folder is `webapp/`, NOT `streamlit/`. A local package named `streamlit` would shadow the installed `streamlit` library and break `import streamlit as st`. Streamlit Cloud runs `webapp/app.py`, which puts `webapp/` on `sys.path`, so all intra-app imports are **flat** (`from data import ...`, `from execute import ...`, `import ai`). Tests use the same flat imports, enabled by an empty `webapp/conftest.py`.
 
 ---
 
 ## File Structure
 
-All new files live under `streamlit/` in the existing `CSV-Reader` repo. The original `csv_reader/csv_reader.py` is untouched.
+All new files live under `webapp/` in the existing `CSV-Reader` repo. The original `csv_reader/csv_reader.py` is untouched.
 
-- `streamlit/data.py` — `load_csv()`, `summarize()`. No AI, no Streamlit. Pure pandas.
-- `streamlit/execute.py` — `execute_plan()`, `generate_graph()`. Pure pandas/matplotlib, provider-independent.
-- `streamlit/ai.py` — Anthropic SDK wrapper: `QueryPlan`, `ChartPlan` schemas + `plan_query()`, `explain()`, `plan_chart()`. Reads secrets.
-- `streamlit/app.py` — Streamlit UI wiring the above together.
-- `streamlit/test_data.py` — unit tests for `summarize()`.
-- `streamlit/test_execute.py` — unit tests for `execute_plan()`.
+- `webapp/data.py` — `load_csv()`, `summarize()`. No AI, no Streamlit. Pure pandas.
+- `webapp/execute.py` — `execute_plan()`, `generate_graph()`. Pure pandas/matplotlib, provider-independent.
+- `webapp/ai.py` — Anthropic SDK wrapper: `QueryPlan`, `ChartPlan` schemas + `plan_query()`, `explain()`, `plan_chart()`. Reads secrets.
+- `webapp/app.py` — Streamlit UI wiring the above together.
+- `webapp/conftest.py` — empty; makes pytest add `webapp/` to `sys.path` so tests use flat imports.
+- `webapp/test_data.py` — unit tests for `summarize()`.
+- `webapp/test_execute.py` — unit tests for `execute_plan()`.
 - `requirements.txt` — at repo root, for Streamlit Cloud.
-- `.streamlit/config.toml` — minimal theme/config.
+- `.streamlit/config.toml` — minimal theme/config (this dot-folder is Streamlit's real config dir and keeps its name).
 
 ---
 
@@ -30,7 +33,7 @@ All new files live under `streamlit/` in the existing `CSV-Reader` repo. The ori
 **Files:**
 - Create: `requirements.txt`
 - Create: `.streamlit/config.toml`
-- Create: `streamlit/__init__.py` (empty, makes the folder importable for tests)
+- Create: `webapp/conftest.py` (empty, so pytest puts `webapp/` on sys.path for flat imports)
 
 - [ ] **Step 1: Create `requirements.txt`**
 
@@ -53,9 +56,9 @@ base = "dark"
 maxUploadSize = 50
 ```
 
-- [ ] **Step 3: Create empty `streamlit/__init__.py`**
+- [ ] **Step 3: Create empty `webapp/conftest.py`**
 
-Create an empty file at `streamlit/__init__.py`.
+Create an empty file at `webapp/conftest.py`.
 
 - [ ] **Step 4: Install dependencies locally**
 
@@ -65,7 +68,7 @@ Expected: installs without error (anthropic, streamlit, pandas, matplotlib, pyda
 - [ ] **Step 5: Commit**
 
 ```bash
-git add requirements.txt .streamlit/config.toml streamlit/__init__.py
+git add requirements.txt .streamlit/config.toml webapp/conftest.py
 git commit -m "chore: scaffold Streamlit app dependencies and config"
 ```
 
@@ -74,16 +77,16 @@ git commit -m "chore: scaffold Streamlit app dependencies and config"
 ## Task 2: Data layer — `summarize()` (TDD)
 
 **Files:**
-- Create: `streamlit/data.py`
-- Test: `streamlit/test_data.py`
+- Create: `webapp/data.py`
+- Test: `webapp/test_data.py`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `streamlit/test_data.py`:
+Create `webapp/test_data.py`:
 
 ```python
 import pandas as pd
-from streamlit.data import summarize
+from data import summarize
 
 
 def _df():
@@ -122,21 +125,19 @@ def test_summarize_includes_group_counts():
 def test_summarize_excludes_raw_rows():
     # The whole point: no raw row data leaves the machine.
     s = summarize(_df())
-    text = repr(s)
-    assert "group_counts" in s
-    # Sentinel string-only check: individual sales values must not be enumerated as a list
+    assert set(s.keys()) == {"meta", "overall_means", "group_counts"}
     assert "raw" not in s
     assert "records" not in s
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `python -m pytest streamlit/test_data.py -v`
-Expected: FAIL with `ModuleNotFoundError: No module named 'streamlit.data'` (or ImportError for `summarize`).
+Run: `python -m pytest webapp/test_data.py -v`
+Expected: FAIL with `ModuleNotFoundError: No module named 'data'` (or ImportError for `summarize`).
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `streamlit/data.py`:
+Create `webapp/data.py`:
 
 ```python
 """Data layer: parse CSVs and produce a schema+stats summary for the AI.
@@ -191,13 +192,13 @@ def summarize(df: pd.DataFrame) -> dict:
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `python -m pytest streamlit/test_data.py -v`
+Run: `python -m pytest webapp/test_data.py -v`
 Expected: PASS (5 tests).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add streamlit/data.py streamlit/test_data.py
+git add webapp/data.py webapp/test_data.py
 git commit -m "feat: add data layer with schema+stats summary"
 ```
 
@@ -206,16 +207,16 @@ git commit -m "feat: add data layer with schema+stats summary"
 ## Task 3: Execution layer — `execute_plan()` (TDD)
 
 **Files:**
-- Create: `streamlit/execute.py`
-- Test: `streamlit/test_execute.py`
+- Create: `webapp/execute.py`
+- Test: `webapp/test_execute.py`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `streamlit/test_execute.py`:
+Create `webapp/test_execute.py`:
 
 ```python
 import pandas as pd
-from streamlit.execute import execute_plan
+from execute import execute_plan
 
 
 def _df():
@@ -267,12 +268,12 @@ def test_missing_filter_column_errors():
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `python -m pytest streamlit/test_execute.py -v`
-Expected: FAIL with `ModuleNotFoundError: No module named 'streamlit.execute'`.
+Run: `python -m pytest webapp/test_execute.py -v`
+Expected: FAIL with `ModuleNotFoundError: No module named 'execute'`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-Create `streamlit/execute.py`. This ports the original `execute_plan` and `generate_graph` logic (provider-independent), with `generate_graph` returning a matplotlib `Figure` instead of a PIL image (Streamlit renders figures directly).
+Create `webapp/execute.py`. This ports the original `execute_plan` and `generate_graph` logic (provider-independent), with `generate_graph` returning a matplotlib `Figure` instead of a PIL image (Streamlit renders figures directly).
 
 ```python
 """Execution layer: run a plan on the full DataFrame and render charts.
@@ -401,13 +402,13 @@ def generate_graph(df, chart_type, x_col, y_col):
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `python -m pytest streamlit/test_execute.py -v`
+Run: `python -m pytest webapp/test_execute.py -v`
 Expected: PASS (4 tests).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add streamlit/execute.py streamlit/test_execute.py
+git add webapp/execute.py webapp/test_execute.py
 git commit -m "feat: add execution layer for plans and charts"
 ```
 
@@ -416,11 +417,11 @@ git commit -m "feat: add execution layer for plans and charts"
 ## Task 4: AI layer — Anthropic SDK wrapper
 
 **Files:**
-- Create: `streamlit/ai.py`
+- Create: `webapp/ai.py`
 
 No unit test: this module calls the live API and reads `st.secrets`. It is smoke-tested manually after deploy. Keep all logic that CAN be tested (parsing, execution) out of this module — it stays a thin wrapper.
 
-- [ ] **Step 1: Create `streamlit/ai.py`**
+- [ ] **Step 1: Create `webapp/ai.py`**
 
 ```python
 """AI layer: Claude calls that return structured plans.
@@ -431,11 +432,11 @@ results — never raw rows.
 """
 
 import json
+from typing import List, Optional
 
 import anthropic
 import streamlit as st
 from pydantic import BaseModel
-from typing import List, Optional
 
 
 # ---- Structured-output schemas ----
@@ -543,15 +544,15 @@ def explain(question: str, plan: QueryPlan, result) -> str:
     return next((b.text for b in response.content if b.type == "text"), "")
 ```
 
-- [ ] **Step 2: Sanity-check imports compile**
+- [ ] **Step 2: Sanity-check syntax**
 
-Run: `python -c "import ast; ast.parse(open('streamlit/ai.py').read()); print('ok')"`
+Run: `python -c "import ast; ast.parse(open('webapp/ai.py').read()); print('ok')"`
 Expected: prints `ok` (syntax valid; we don't import it directly because it imports streamlit at module load).
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add streamlit/ai.py
+git add webapp/ai.py
 git commit -m "feat: add Claude AI layer with structured query and chart plans"
 ```
 
@@ -560,9 +561,9 @@ git commit -m "feat: add Claude AI layer with structured query and chart plans"
 ## Task 5: Streamlit UI — `app.py`
 
 **Files:**
-- Create: `streamlit/app.py`
+- Create: `webapp/app.py`
 
-- [ ] **Step 1: Create `streamlit/app.py`**
+- [ ] **Step 1: Create `webapp/app.py`**
 
 ```python
 """Streamlit UI for the AI CSV reader, backed by Claude."""
@@ -570,9 +571,9 @@ git commit -m "feat: add Claude AI layer with structured query and chart plans"
 import anthropic
 import streamlit as st
 
-from streamlit.data import load_csv, summarize
-from streamlit.execute import execute_plan, generate_graph
-from streamlit import ai
+import ai
+from data import load_csv, summarize
+from execute import execute_plan, generate_graph
 
 st.set_page_config(page_title="CSV Data Analyzer", page_icon="📊", layout="wide")
 st.title("📊 CSV Data Analyzer")
@@ -601,10 +602,6 @@ if uploaded is not None:
 df = st.session_state.get("df")
 
 
-def _summary():
-    return summarize(df)
-
-
 def _friendly_ai_error(e: Exception) -> str:
     if isinstance(e, anthropic.RateLimitError):
         return "Claude is rate-limited right now — please wait a moment and retry."
@@ -618,17 +615,18 @@ def _friendly_ai_error(e: Exception) -> str:
 if df is not None:
     st.divider()
     st.subheader("💬 Ask a question")
-    question = st.text_input("Your question", placeholder="e.g., What is the average sales by category?")
+    question = st.text_input(
+        "Your question", placeholder="e.g., What is the average sales by category?"
+    )
     if st.button("Ask Claude", type="primary") and question:
         with st.spinner("Thinking..."):
             try:
-                plan = ai.plan_query(question, _summary())
+                plan = ai.plan_query(question, summarize(df))
                 result, err = execute_plan(df, plan.model_dump(exclude_none=True))
                 if err:
                     st.error(f"Could not run that query: {err}")
                 else:
-                    answer = ai.explain(question, plan, result)
-                    st.markdown(answer)
+                    st.markdown(ai.explain(question, plan, result))
             except Exception as e:  # noqa: BLE001
                 st.error(_friendly_ai_error(e))
 
@@ -640,7 +638,7 @@ if df is not None:
     if st.button("Make chart", type="primary") and chart_request:
         with st.spinner("Building chart..."):
             try:
-                chart = ai.plan_chart(chart_request, _summary())
+                chart = ai.plan_chart(chart_request, summarize(df))
                 fig = generate_graph(df, chart.chart_type, chart.x_column, chart.y_column)
                 if fig is None:
                     st.error(
@@ -656,36 +654,28 @@ if df is not None:
                 st.error(_friendly_ai_error(e))
 ```
 
-- [ ] **Step 2: Verify the app imports without a syntax error**
+- [ ] **Step 2: Verify the app parses without a syntax error**
 
-Run: `python -c "import ast; ast.parse(open('streamlit/app.py').read()); print('ok')"`
+Run: `python -c "import ast; ast.parse(open('webapp/app.py').read()); print('ok')"`
 Expected: prints `ok`.
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add streamlit/app.py
+git add webapp/app.py
 git commit -m "feat: add Streamlit UI wiring data, AI, and execution layers"
 ```
 
 ---
 
-## Task 6: Local smoke test of the full app
+## Task 6: Test suite + gitignore (automatable parts)
 
-**Files:** none (manual verification)
+**Files:**
+- Create: `.gitignore`
 
-- [ ] **Step 1: Set a local secret for testing**
+The live smoke test (running the app with a real key) is done by the user; this task covers the parts that can be automated here.
 
-Create `.streamlit/secrets.toml` (this file is gitignored in the next step — never commit it):
-
-```toml
-ANTHROPIC_API_KEY = "sk-ant-...your-key..."
-ANTHROPIC_MODEL = "claude-haiku-4-5"
-```
-
-- [ ] **Step 2: Add `.streamlit/secrets.toml` to `.gitignore`**
-
-Create or append to `.gitignore` at repo root:
+- [ ] **Step 1: Create or append `.gitignore` at repo root**
 
 ```
 .streamlit/secrets.toml
@@ -694,17 +684,12 @@ __pycache__/
 .pytest_cache/
 ```
 
-- [ ] **Step 3: Run the app locally**
+- [ ] **Step 2: Run the full test suite**
 
-Run: `python -m streamlit run streamlit/app.py`
-Expected: a browser tab opens. Upload a small CSV (e.g. the Desktop `vgsales` data), confirm preview shows, ask "what is the average of <a numeric column>?", confirm an answer appears, and request a bar chart, confirm it renders.
+Run: `python -m pytest webapp/ -v`
+Expected: all tests in `test_data.py` (5) and `test_execute.py` (4) PASS.
 
-- [ ] **Step 4: Run the full test suite**
-
-Run: `python -m pytest streamlit/ -v`
-Expected: all tests in `test_data.py` and `test_execute.py` PASS.
-
-- [ ] **Step 5: Commit the gitignore**
+- [ ] **Step 3: Commit**
 
 ```bash
 git add .gitignore
@@ -725,18 +710,18 @@ Add to the end of `README.md`:
 ```markdown
 ## Streamlit web app (Claude-powered)
 
-A Streamlit version lives in `streamlit/`. It uses Claude (Anthropic) and sends
+A Streamlit version lives in `webapp/`. It uses Claude (Anthropic) and sends
 only a schema + summary statistics to the model — never raw rows.
 
 **Run locally:**
 1. `pip install -r requirements.txt`
 2. Put your key in `.streamlit/secrets.toml`:
    `ANTHROPIC_API_KEY = "sk-ant-..."`
-3. `streamlit run streamlit/app.py`
+3. `streamlit run webapp/app.py`
 
 **Deploy on Streamlit Community Cloud:**
 1. Connect this repo at https://share.streamlit.io
-2. Set the main file to `streamlit/app.py`
+2. Set the main file to `webapp/app.py`
 3. Add `ANTHROPIC_API_KEY` (and optional `ANTHROPIC_MODEL`) in the app's
    Secrets settings.
 ```
@@ -746,7 +731,7 @@ only a schema + summary statistics to the model — never raw rows.
 ```bash
 git add README.md
 git commit -m "docs: document the Streamlit app and deployment"
-git push origin main
+git push -u origin streamlit-claude-port
 ```
 
 Expected: push succeeds to `YutaB123/CSV-Reader`.
@@ -765,7 +750,7 @@ Go to https://share.streamlit.io and sign in with the GitHub account `YutaB123`.
 
 - [ ] **Step 2: Create the app**
 
-Click "Create app" → "Deploy a public app from GitHub" → select repo `YutaB123/CSV-Reader`, branch `main`, main file path `streamlit/app.py`.
+Click "Create app" → "Deploy a public app from GitHub" → select repo `YutaB123/CSV-Reader`, branch `main` (after merge) or `streamlit-claude-port`, main file path `webapp/app.py`.
 
 - [ ] **Step 3: Add secrets**
 
@@ -786,4 +771,5 @@ Click "Deploy". Wait for the build. When it loads, upload a CSV, ask a question,
 
 - **Spec coverage:** data layer (Task 2), AI layer (Task 4), execution+UI (Tasks 3, 5), schema-only-to-AI (Task 2 + test_summarize_excludes_raw_rows), deployment to same repo subfolder (Tasks 1, 7, 8), error handling (Task 5 `_friendly_ai_error`, missing-key notice), testing (Tasks 2, 3, 6), Haiku default (Task 4 `DEFAULT_MODEL`). All covered.
 - **Type consistency:** `QueryPlan` / `ChartPlan` defined in Task 4 are consumed in Task 5 via `.model_dump(exclude_none=True)` and attribute access (`chart.chart_type`); `execute_plan` (Task 3) consumes the dict form; `generate_graph` returns a Figure consumed by `st.pyplot`. Consistent.
+- **Import scheme:** folder is `webapp/` (not `streamlit/`) to avoid shadowing the library; all intra-app imports are flat; `webapp/conftest.py` makes pytest resolve them.
 - **Anthropic API:** uses `messages.parse(..., output_format=Model)` returning `.parsed_output`, and plain `messages.create(...)` for `explain`, per the current SDK. Model default `claude-haiku-4-5`.
