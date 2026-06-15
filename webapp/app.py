@@ -17,6 +17,15 @@ if not ai.api_key_configured():
         "The app admin needs to set ANTHROPIC_API_KEY (as a Streamlit secret "
         "or an environment variable) before AI features will work."
     )
+    # TEMPORARY diagnostic (no secret values shown) — remove after deploy works.
+    import os
+
+    anthropic_names = sorted(k for k in os.environ if "ANTHROP" in k.upper())
+    key_len = len(os.environ.get("ANTHROPIC_API_KEY", ""))
+    st.caption(
+        f"Debug — env var names with 'ANTHROP': {anthropic_names or 'NONE'} · "
+        f"ANTHROPIC_API_KEY length: {key_len}"
+    )
 
 uploaded = st.file_uploader("Select a CSV file", type=["csv"])
 
